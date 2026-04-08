@@ -1,10 +1,14 @@
 'use client';
 
 import { useMemo, useState, type DragEvent } from 'react';
-import { CheckCircle2, Download, ImagePlus, Loader2, SlidersHorizontal, Trash2, UploadCloud } from 'lucide-react';
+import { CheckCircle2, ChevronDown, Download, ImagePlus, Loader2, SlidersHorizontal, Trash2, UploadCloud } from 'lucide-react';
 import JSZip from 'jszip';
 import { saveAs } from 'file-saver';
 import { processImageFile } from '@/lib/imageProcessor';
+import Image from 'next/image';
+
+export const dynamic = 'force-dynamic';
+export const runtime = 'edge';
 
 type ImageItem = {
     id: string;
@@ -195,9 +199,22 @@ export default function Home() {
                 <section className="rounded-3xl border border-slate-200 bg-white p-8 shadow-sm">
                     <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
                         <div>
-                            <p className="text-sm font-semibold uppercase tracking-[0.24em] text-sky-600">F-Commerce Batch Optimizer</p>
-                            <h1 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950 sm:text-4xl">
-                                Optimize Facebook product photos without a backend.
+                            <div className="flex items-center gap-4">
+                                <Image
+                                    src="/logo.png"
+                                    alt="F-Commerce Batch Optimizer Logo"
+                                    height={60}
+                                    width={120}
+                                    className="object-contain"
+                                />
+                                <div>
+                                    <p className="text-sm font-semibold uppercase tracking-[0.24em] text-sky-600">
+                                        ShopSnap Photo Optimizer
+                                    </p>
+                                </div>
+                            </div>
+                            <h1 className="mt-4 text-3xl font-semibold tracking-tight text-slate-950 sm:text-4xl">
+                                Optimize product photos with your logo.
                             </h1>
                             <p className="mt-3 max-w-2xl text-sm text-slate-600 sm:text-base">
                                 Drop JPG, PNG, or HEIC images, convert to optimized JPG, watermark with your shop logo, and download
@@ -318,11 +335,11 @@ export default function Home() {
 
                     <aside className="space-y-6 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
                         <div className="flex items-center gap-3">
-                            <div className="inline-flex h-11 w-11 items-center justify-center rounded-2xl bg-sky-100 text-sky-700">
-                                <SlidersHorizontal className="h-5 w-5" />
-                            </div>
                             <div>
-                                <h2 className="text-lg font-semibold text-slate-950">Settings</h2>
+                                <h2 className="flex items-center gap-2 text-lg font-semibold text-slate-950">
+                                    <SlidersHorizontal className="h-5 w-5" />
+                                    Settings
+                                </h2>
                                 <p className="text-sm text-slate-500">
                                     Logo, watermark toggle, and quality controls for Facebook-ready posts.
                                 </p>
@@ -357,13 +374,13 @@ export default function Home() {
                                 </div>
                                 <button
                                     type="button"
-                                    className={`inline-flex h-10 w-16 items-center rounded-full p-1 transition ${
+                                    className={`inline-flex h-10 w-20 items-center rounded-full p-1 transition ${
                                         watermarkEnabled ? 'bg-sky-600' : 'bg-slate-300'
                                     }`}
                                     onClick={() => setWatermarkEnabled((current) => !current)}
                                 >
                                     <span
-                                        className={`h-8 w-8 rounded-full bg-white transition ${watermarkEnabled ? 'translate-x-8' : 'translate-x-0'}`}
+                                        className={`h-8 w-8 rounded-full bg-white transition ${watermarkEnabled ? 'translate-x-5' : 'translate-x-0'}`}
                                     />
                                 </button>
                             </div>
@@ -423,6 +440,170 @@ export default function Home() {
                         ) : null}
                     </aside>
                 </div>
+
+                <section className="mt-12">
+                    <div className="mx-auto max-w-4xl">
+                        <div className="text-center">
+                            <h2 className="text-2xl font-semibold text-slate-950">Frequently Asked Questions</h2>
+                            <p className="mt-2 text-sm text-slate-600">
+                                Everything you need to know about optimizing your Facebook product photos.
+                            </p>
+                        </div>
+
+                        <div className="mt-8 space-y-6">
+                            <details className="group rounded-2xl border border-slate-200 bg-white p-4">
+                                <summary className="flex cursor-pointer items-center justify-between font-semibold text-slate-900">
+                                    How does this tool work?
+                                    <span className="ml-2 text-slate-500 group-open:rotate-180">
+                                        <ChevronDown />
+                                    </span>
+                                </summary>
+                                <div className="mt-3 text-sm text-slate-600">
+                                    <p>
+                                        This tool runs entirely in your browser. When you upload photos, they&apos;re processed locally
+                                        using JavaScript libraries. HEIC files are converted to JPG, images are resized to 1080px width
+                                        (Facebook&apos;s optimal size), watermarks are applied, and everything is packaged into a ZIP file
+                                        for download. No data ever leaves your device.
+                                    </p>
+                                </div>
+                            </details>
+
+                            <details className="group rounded-2xl border border-slate-200 bg-white p-4">
+                                <summary className="flex cursor-pointer items-center justify-between font-semibold text-slate-900">
+                                    What file formats are supported?
+                                    <span className="ml-2 text-slate-500 group-open:rotate-180">
+                                        <ChevronDown />
+                                    </span>
+                                </summary>
+                                <div className="mt-3 text-sm text-slate-600">
+                                    <p>
+                                        Supports JPG, PNG, and HEIC formats. HEIC files (common on iPhones) are automatically converted to
+                                        JPG. All output files are optimized JPGs regardless of input format.
+                                    </p>
+                                </div>
+                            </details>
+
+                            <details className="group rounded-2xl border border-slate-200 bg-white p-4">
+                                <summary className="flex cursor-pointer items-center justify-between font-semibold text-slate-900">
+                                    Why 1080px width specifically?
+                                    <span className="ml-2 text-slate-500 group-open:rotate-180">
+                                        <ChevronDown />
+                                    </span>
+                                </summary>
+                                <div className="mt-3 text-sm text-slate-600">
+                                    <p>
+                                        Facebook Marketplace and Instagram Shop optimize best at 1080px width. This size provides the
+                                        perfect balance between quality and file size for fast loading on mobile networks in Bangladesh.
+                                        Higher resolutions get compressed aggressively by Facebook anyway.
+                                    </p>
+                                </div>
+                            </details>
+
+                            <details className="group rounded-2xl border border-slate-200 bg-white p-4">
+                                <summary className="flex cursor-pointer items-center justify-between font-semibold text-slate-900">
+                                    Is my data safe and private?
+                                    <span className="ml-2 text-slate-500 group-open:rotate-180">
+                                        <ChevronDown />
+                                    </span>
+                                </summary>
+                                <div className="mt-3 text-sm text-slate-600">
+                                    <p>
+                                        Absolutely. This is a client-side only tool - all processing happens in your browser. Your photos
+                                        never touch any server, database, or cloud service. You can verify this by checking your
+                                        browser&apos;s network tab during processing (no external requests are made).
+                                    </p>
+                                </div>
+                            </details>
+
+                            <details className="group rounded-2xl border border-slate-200 bg-white p-4">
+                                <summary className="flex cursor-pointer items-center justify-between font-semibold text-slate-900">
+                                    What&apos;s the recommended compression quality?
+                                    <span className="ml-2 text-slate-500 group-open:rotate-180">
+                                        <ChevronDown />
+                                    </span>
+                                </summary>
+                                <div className="mt-3 text-sm text-slate-600">
+                                    <p>
+                                        For Facebook Marketplace, we recommend 80-92% quality. This typically results in files under 600KB
+                                        while maintaining excellent visual quality. Higher quality means larger files, which can be
+                                        problematic on slow mobile connections in Bangladesh.
+                                    </p>
+                                </div>
+                            </details>
+
+                            <details className="group rounded-2xl border border-slate-200 bg-white p-4">
+                                <summary className="flex cursor-pointer items-center justify-between font-semibold text-slate-900">
+                                    Does it work on mobile phones?
+                                    <span className="ml-2 text-slate-500 group-open:rotate-180">
+                                        <ChevronDown />
+                                    </span>
+                                </summary>
+                                <div className="mt-3 text-sm text-slate-600">
+                                    <p>
+                                        Yes! The tool is fully responsive and works on mobile browsers. However, for best performance with
+                                        large batches, we recommend using a desktop or laptop computer. Mobile browsers have memory
+                                        limitations that might affect processing of very large image batches.
+                                    </p>
+                                </div>
+                            </details>
+
+                            <details className="group rounded-2xl border border-slate-200 bg-white p-4">
+                                <summary className="flex cursor-pointer items-center justify-between font-semibold text-slate-900">
+                                    Can I process hundreds of photos at once?
+                                    <span className="ml-2 text-slate-500 group-open:rotate-180">
+                                        <ChevronDown />
+                                    </span>
+                                </summary>
+                                <div className="mt-3 text-sm text-slate-600">
+                                    <p>
+                                        Yes, but browser memory limits apply. Most modern computers can handle 50-100 photos in a single
+                                        batch. If you have thousands of photos, process them in smaller batches. The tool is optimized for
+                                        Bangladesh&apos;s typical Facebook seller workflow of 20-50 product photos per listing session.
+                                    </p>
+                                </div>
+                            </details>
+
+                            <details className="group rounded-2xl border border-slate-200 bg-white p-4">
+                                <summary className="flex cursor-pointer items-center justify-between font-semibold text-slate-900">
+                                    What browsers are supported?
+                                    <span className="ml-2 text-slate-500 group-open:rotate-180">
+                                        <ChevronDown />
+                                    </span>
+                                </summary>
+                                <div className="mt-3 text-sm text-slate-600">
+                                    <p>
+                                        Works on all modern browsers: Chrome, Firefox, Safari, and Edge. Requires JavaScript enabled. For
+                                        best HEIC support, use Chrome or Safari. The tool uses modern web APIs that are widely supported in
+                                        browsers from 2020 onwards.
+                                    </p>
+                                </div>
+                            </details>
+                        </div>
+                    </div>
+                </section>
+
+                <footer className="mt-12">
+                    <div className="mx-auto max-w-4xl text-center">
+                        <h3 className="text-lg font-semibold text-slate-950">Privacy & Security</h3>
+                        <div className="mt-4 space-y-3 text-sm text-slate-600">
+                            <p>
+                                <strong>100% Client-Side Processing:</strong> All image conversion, resizing, and watermarking happens
+                                directly in your browser. Your photos never leave your device or touch any server.
+                            </p>
+                            <p>
+                                <strong>No Data Collection:</strong> We don&apos;t store, track, or analyze your images. This tool is built
+                                with privacy-first principles for Bangladesh-based Facebook sellers.
+                            </p>
+                            <p>
+                                <strong>Open Source:</strong> The code is open source and auditable. You can verify that your data stays
+                                local by inspecting the browser&apos;s network tab - no external requests are made during processing.
+                            </p>
+                        </div>
+                        <div className="mt-6 flex flex-wrap items-center justify-center gap-4 text-xs text-slate-500">
+                            <span>© {new Date().getFullYear()} SnapShot team</span>
+                        </div>
+                    </div>
+                </footer>
             </div>
         </main>
     );

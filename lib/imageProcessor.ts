@@ -19,7 +19,6 @@ export async function processImageFile(file: File, options: ImageProcessOptions)
             blob: file,
             toType: 'image/jpeg',
             quality: 0.95,
-            useCanvas: true,
         })) as Blob;
 
         workFile = new File([convertedBlob], `${originalName}.jpg`, {
@@ -67,7 +66,11 @@ export async function processImageFile(file: File, options: ImageProcessOptions)
         );
     });
 
-    const compressedBlob = await imageCompression(jpegBlob, {
+    const compressionInput = new File([jpegBlob], `${originalName}.jpg`, {
+        type: 'image/jpeg',
+    });
+
+    const compressedFile = await imageCompression(compressionInput, {
         maxSizeMB: 1,
         maxWidthOrHeight: maxWidth,
         initialQuality: options.quality ?? 0.88,
@@ -75,7 +78,7 @@ export async function processImageFile(file: File, options: ImageProcessOptions)
         fileType: 'image/jpeg',
     });
 
-    return compressedBlob;
+    return compressedFile instanceof Blob ? compressedFile : new Blob([compressedFile], { type: 'image/jpeg' });
 }
 
 async function loadImage(src: string): Promise<HTMLImageElement> {
