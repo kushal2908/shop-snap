@@ -35,7 +35,7 @@ export const metadata: Metadata = {
         description: 'Stop struggling with blurry Facebook photos. Convert, resize, and watermark your entire catalog in seconds.',
         url: 'https://shopsnap.com',
         siteName: 'shopSnap BD',
-        images: [{ url: '/og-image.png', width: 1200, height: 630, alt: 'shopSnap Tool Interface' }],
+        images: [{ url: '/logo.png', width: 1200, height: 630, alt: 'shopSnap Tool Interface' }],
         locale: 'en_BD', // Targeting Bangladesh specifically
         type: 'website',
     },
