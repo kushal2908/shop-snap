@@ -13,37 +13,54 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-    title: 'shopSnap | Fast Photo Optimizer for Bangladesh F-Commerce',
+    title: 'shopSnap | Batch Photo Optimizer for Facebook & Instagram Sellers',
     description:
-        'The #1 free tool for BD Facebook sellers. Convert iPhone HEIC photos to JPG, batch resize for 1080px clarity, and add shop watermarks instantly. 100% private, client-side processing.',
+        'The fastest 100% client-side tool for Bangladesh F-Commerce. Bulk convert HEIC, resize to 1080px for high-definition Facebook posts, and add shop watermarks. Privacy-first image processing.',
     keywords: [
         'shopSnap',
-        'Facebook shop photo optimizer Bangladesh',
-        'iPhone HEIC to JPG converter online free',
-        'batch watermark tool for f-commerce',
-        'resize photo for facebook marketplace bangladesh',
-        'online product photo editor for online business',
-        'bulk image compressor for bkash sellers',
+        'F-commerce photo optimizer',
+        'Facebook marketplace image resizer',
+        'bulk watermark photos online free',
+        'HEIC to JPG converter Bangladesh',
+        'product photography post-processing tool',
+        'sell on facebook marketplace bangladesh',
+        'online business photo branding',
     ],
     authors: [{ name: 'shopSnap Team' }],
     creator: 'shopSnap',
     publisher: 'shopSnap',
-    // ... (Keep your existing formatDetection and alternates)
-    metadataBase: new URL('https://shopsnap.com'), // Use your final domain here
+    metadataBase: new URL('https://shopsnap.xyz'),
+    alternates: {
+        canonical: '/',
+    },
     openGraph: {
-        title: 'shopSnap - Ready-to-Post Product Photos in One Click',
-        description: 'Stop struggling with blurry Facebook photos. Convert, resize, and watermark your entire catalog in seconds.',
-        url: 'https://shopsnap.com',
-        siteName: 'shopSnap BD',
-        images: [{ url: '/logo.png', width: 1200, height: 630, alt: 'shopSnap Tool Interface' }],
-        locale: 'en_BD', // Targeting Bangladesh specifically
+        title: 'shopSnap - Professional Product Photos in Seconds',
+        description: 'Stop uploading blurry photos. Get high-definition, watermarked images optimized for the Facebook algorithm.',
+        url: 'https://shopsnap.xyz',
+        siteName: 'shopSnap Bangladesh',
+        images: [{ url: '/og-image.png', width: 1200, height: 630, alt: 'shopSnap Dashboard' }],
+        locale: 'en_BD',
         type: 'website',
     },
-    // ... (Keep existing Twitter and Robots)
+    twitter: {
+        card: 'summary_large_image',
+        title: 'shopSnap | Social Commerce Photo Optimizer',
+        description: 'Batch resize and watermark your product photos. 100% browser-based and private.',
+        images: ['/og-image.png'],
+    },
+    robots: {
+        index: true,
+        follow: true,
+        googleBot: {
+            index: true,
+            follow: true,
+            'max-image-preview': 'large',
+        },
+    },
     verification: {
         google: 'your-google-site-verification-code',
     },
-    category: 'E-commerce Tools',
+    category: 'E-commerce Utility',
 };
 
 export default function RootLayout({
