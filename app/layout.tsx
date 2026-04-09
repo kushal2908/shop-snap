@@ -91,6 +91,7 @@ export default function RootLayout({
     return (
         <html lang="en" className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}>
             <head>
+                <meta name="google-adsense-account" content="ca-pub-5391881178707156" />
                 <script
                     type="application/ld+json"
                     dangerouslySetInnerHTML={{
