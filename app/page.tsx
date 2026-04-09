@@ -4,6 +4,7 @@ import { useMemo, useState, type DragEvent } from 'react';
 import { CheckCircle2, ChevronDown, Download, ImagePlus, Loader2, SlidersHorizontal, Trash2, UploadCloud } from 'lucide-react';
 import JSZip from 'jszip';
 import { saveAs } from 'file-saver';
+import Link from 'next/link';
 import { processImageFile } from '@/lib/imageProcessor';
 import Image from 'next/image';
 
@@ -584,22 +585,13 @@ export default function Home() {
 
                 <footer className="mt-12">
                     <div className="mx-auto max-w-4xl text-center">
-                        <h3 className="text-lg font-semibold text-slate-950">Privacy & Security</h3>
-                        <div className="mt-4 space-y-3 text-sm text-slate-600">
-                            <p>
-                                <strong>100% Client-Side Processing:</strong> All image conversion, resizing, and watermarking happens
-                                directly in your browser. Your photos never leave your device or touch any server.
-                            </p>
-                            <p>
-                                <strong>No Data Collection:</strong> We don&apos;t store, track, or analyze your images. This tool is built
-                                with privacy-first principles for Bangladesh-based Facebook sellers.
-                            </p>
-                            <p>
-                                <strong>Open Source:</strong> The code is open source and auditable. You can verify that your data stays
-                                local by inspecting the browser&apos;s network tab - no external requests are made during processing.
-                            </p>
-                        </div>
-                        <div className="mt-6 flex flex-wrap items-center justify-center gap-4 text-xs text-slate-500">
+                        <div className="mt-6 flex flex-wrap items-center justify-center gap-4 text-sm text-slate-500">
+                            <Link href="/privacy-policy" className="hover:text-slate-900">
+                                Privacy Policy
+                            </Link>
+                            <Link href="/terms" className="hover:text-slate-900">
+                                Terms
+                            </Link>
                             <span>© {new Date().getFullYear()} SnapShot team</span>
                         </div>
                     </div>
