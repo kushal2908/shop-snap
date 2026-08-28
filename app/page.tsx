@@ -1,26 +1,24 @@
 'use client';
 
-import { useMemo, useState, type DragEvent } from 'react';
-import { CheckCircle2, ChevronDown, Download, ImagePlus, Loader2, SlidersHorizontal, Trash2, UploadCloud } from 'lucide-react';
-import JSZip from 'jszip';
-import { saveAs } from 'file-saver';
-import Link from 'next/link';
+import { useState } from 'react';
+import { Save } from 'lucide-react';
+import Header from '@/components/layout/Header';
+import Footer from '@/components/layout/Footer';
+import DropZone from '@/components/upload/DropZone';
+import ImageGrid from '@/components/gallery/ImageGrid';
+import PreviewModal from '@/components/gallery/PreviewModal';
+import SettingsDrawer from '@/components/settings/SettingsDrawer';
+import SettingsPanel from '@/components/settings/SettingsPanel';
+import DownloadButton, { downloadSingleImage } from '@/components/actions/DownloadButton';
+import BatchProgressBar from '@/components/progress/BatchProgressBar';
+import ProcessingSummary from '@/components/progress/ProcessingSummary';
+import StepIndicator, { type Step } from '@/components/progress/StepIndicator';
 import { processImageFile } from '@/lib/imageProcessor';
-import Image from 'next/image';
+import type { WatermarkPosition } from '@/lib/watermarkEngine';
+import type { ImageItem } from '@/lib/types';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'edge';
-
-type ImageItem = {
-    id: string;
-    file: File;
-    name: string;
-    preview: string;
-    status: 'pending' | 'processing' | 'ready' | 'error';
-    outputUrl?: string;
-    blob?: Blob;
-    error?: string;
-};
 
 const supportedTypes = ['image/jpeg', 'image/png', 'image/heic', 'image/heif'];
 
@@ -28,21 +26,27 @@ const getOutputName = (fileName: string) => `${fileName.replace(/\.[^.]+$/, '')}
 
 export default function Home() {
     const [items, setItems] = useState<ImageItem[]>([]);
-    const [logoFile, setLogoFile] = useState<File | null>(null);
     const [logoPreview, setLogoPreview] = useState<string | null>(null);
     const [watermarkEnabled, setWatermarkEnabled] = useState(true);
+    const [position, setPosition] = useState<WatermarkPosition>('br');
+    const [opacity, setOpacity] = useState(85);
+    const [size, setSize] = useState(24);
     const [quality, setQuality] = useState(88);
     const [busyMessage, setBusyMessage] = useState<string>('');
+    const [drawerOpen, setDrawerOpen] = useState(false);
+    const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+    const [step, setStep] = useState<Step>('upload');
 
-    const completedCount = useMemo(() => items.filter((item) => item.status === 'ready').length, [items]);
+    const completedCount = items.filter((item) => item.status === 'ready').length;
+    const processingCount = items.filter((item) => item.status === 'processing').length;
+    const errorCount = items.filter((item) => item.status === 'error').length;
+    const allDone = items.length > 0 && processingCount === 0 && completedCount === items.length;
 
-    const handleInputFiles = async (files: FileList | File[]) => {
-        const incoming = Array.from(files).filter((file) => supportedTypes.includes(file.type) || /\.(heic|heif)$/i.test(file.name));
-        if (incoming.length === 0) {
-            return;
-        }
+    const handleFiles = async (files: File[]) => {
+        const valid = files.filter((file) => supportedTypes.includes(file.type) || /\.(heic|heif)$/i.test(file.name));
+        if (valid.length === 0) return;
 
-        const newItems = incoming.map((file) => ({
+        const newItems: ImageItem[] = valid.map((file) => ({
             id: `${Date.now()}-${file.name}-${Math.random()}`,
             file,
             name: file.name,
@@ -55,6 +59,7 @@ export default function Home() {
         const watermarkLogo = logoPreview ?? undefined;
         const useWatermark = watermarkEnabled;
         const qualityRatio = quality / 100;
+        const watermarkOptions = { opacity: opacity / 100, scale: size / 100, position };
 
         await Promise.all(
             newItems.map(async (item) => {
@@ -66,9 +71,8 @@ export default function Home() {
                         quality: qualityRatio,
                         watermark: useWatermark,
                         logoDataUrl: watermarkLogo,
+                        watermarkOptions,
                     });
-
-                    const outputUrl = URL.createObjectURL(blob);
 
                     setItems((current) =>
                         current.map((next) =>
@@ -77,11 +81,11 @@ export default function Home() {
                                       ...next,
                                       status: 'ready',
                                       blob,
-                                      outputUrl,
+                                      outputUrl: URL.createObjectURL(blob),
                                       name: getOutputName(item.name),
                                   }
-                                : next,
-                        ),
+                                : next
+                        )
                     );
                 } catch (error) {
                     setItems((current) =>
@@ -92,71 +96,38 @@ export default function Home() {
                                       status: 'error',
                                       error: error instanceof Error ? error.message : 'Processing failed',
                                   }
-                                : next,
-                        ),
+                                : next
+                        )
                     );
                 }
-            }),
+            })
         );
+
+        setStep((current) => (current === 'upload' ? 'configure' : current));
     };
 
-    const handleDrop = async (event: DragEvent<HTMLDivElement>) => {
-        event.preventDefault();
-        event.stopPropagation();
-        if (event.dataTransfer.files.length > 0) {
-            await handleInputFiles(event.dataTransfer.files);
-        }
-    };
-
-    const handleLogoUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
-        const file = event.target.files?.[0];
-        if (!file) return;
-        const preview = URL.createObjectURL(file);
-        setLogoFile(file);
-        setLogoPreview(preview);
+    const handleLogoUpload = (file: File) => {
+        setLogoPreview(URL.createObjectURL(file));
     };
 
     const removeItem = (id: string) => {
         setItems((current) => {
             const candidate = current.find((item) => item.id === id);
-            if (candidate?.preview) {
-                URL.revokeObjectURL(candidate.preview);
-            }
-            if (candidate?.outputUrl) {
-                URL.revokeObjectURL(candidate.outputUrl);
-            }
+            if (candidate?.preview) URL.revokeObjectURL(candidate.preview);
+            if (candidate?.outputUrl) URL.revokeObjectURL(candidate.outputUrl);
             return current.filter((item) => item.id !== id);
         });
     };
 
-    const downloadZip = async () => {
-        const readyItems = items.filter((item) => item.status === 'ready' && item.blob);
-        if (readyItems.length === 0) {
-            return;
-        }
-
-        setBusyMessage('Building ZIP file...');
-        const zip = new JSZip();
-
-        readyItems.forEach((item) => {
-            if (item.blob) {
-                zip.file(item.name, item.blob);
-            }
-        });
-
-        const blob = await zip.generateAsync({ type: 'blob' });
-        saveAs(blob, 'fb-photos-optimized.zip');
-        setBusyMessage('');
-    };
-
     const reprocessAll = async () => {
-        setBusyMessage('Re-processing images with current settings...');
+        setBusyMessage('Re-processing images with current settings…');
         const currentItems = items;
         setItems((current) => current.map((item) => ({ ...item, status: 'processing', error: undefined })));
 
         const watermarkLogo = logoPreview ?? undefined;
         const useWatermark = watermarkEnabled;
         const qualityRatio = quality / 100;
+        const watermarkOptions = { opacity: opacity / 100, scale: size / 100, position };
 
         await Promise.all(
             currentItems.map(async (item) => {
@@ -167,13 +138,15 @@ export default function Home() {
                         quality: qualityRatio,
                         watermark: useWatermark,
                         logoDataUrl: watermarkLogo,
+                        watermarkOptions,
                     });
 
-                    const outputUrl = URL.createObjectURL(blob);
                     setItems((current) =>
                         current.map((next) =>
-                            next.id === item.id ? { ...next, status: 'ready', blob, outputUrl, name: getOutputName(item.name) } : next,
-                        ),
+                            next.id === item.id
+                                ? { ...next, status: 'ready', blob, outputUrl: URL.createObjectURL(blob), name: getOutputName(item.name) }
+                                : next
+                        )
                     );
                 } catch (error) {
                     setItems((current) =>
@@ -184,419 +157,177 @@ export default function Home() {
                                       status: 'error',
                                       error: error instanceof Error ? error.message : 'Processing failed',
                                   }
-                                : next,
-                        ),
+                                : next
+                        )
                     );
                 }
-            }),
+            })
         );
 
         setBusyMessage('');
+        setStep('download');
+    };
+
+    const handlePreview = (item: ImageItem) => {
+        if (item.outputUrl) setPreviewUrl(item.outputUrl);
+    };
+
+    const settingsProps = {
+        logoPreview,
+        onLogoUpload: handleLogoUpload,
+        watermarkEnabled,
+        onWatermarkToggle: setWatermarkEnabled,
+        position,
+        onPositionChange: setPosition,
+        opacity,
+        onOpacityChange: setOpacity,
+        size,
+        onSizeChange: setSize,
+        quality,
+        onQualityChange: setQuality,
+        onReprocessAll: reprocessAll,
+        canReprocess: items.length > 0,
+        isProcessing: processingCount > 0,
     };
 
     return (
-        <main className="min-h-screen bg-slate-50 px-4 py-6 text-slate-900 sm:px-6 lg:px-10">
-            <div className="mx-auto flex max-w-7xl flex-col gap-8">
-                <section className="rounded-3xl border border-slate-200 bg-white p-8 shadow-sm">
-                    <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
-                        <div>
-                            <div className="flex items-center gap-4">
-                                <Image
-                                    src="/logo.png"
-                                    alt="F-Commerce Batch Optimizer Logo"
-                                    height={60}
-                                    width={120}
-                                    className="object-contain"
-                                />
-                                <div>
-                                    <p className="text-sm font-semibold uppercase tracking-[0.24em] text-sky-600">
-                                        ShopSnap Photo Optimizer
-                                    </p>
-                                </div>
-                            </div>
-                            <h1 className="mt-4 text-3xl font-semibold tracking-tight text-slate-950 sm:text-4xl">
-                                Optimize product photos with your logo.
-                            </h1>
-                            <p className="mt-3 max-w-2xl text-sm text-slate-600 sm:text-base">
-                                Drop JPG, PNG, or HEIC images, convert to optimized JPG, watermark with your shop logo, and download
-                                everything as a ZIP.
-                            </p>
-                        </div>
-                        <div className="rounded-3xl bg-slate-950 px-5 py-4 text-slate-50 shadow-lg sm:px-6">
-                            <p className="text-sm text-slate-400">Ready items</p>
-                            <p className="mt-2 text-3xl font-semibold">
-                                {completedCount}/{items.length}
-                            </p>
-                        </div>
-                    </div>
-                </section>
+        <div className="flex min-h-screen flex-col bg-slate-50 text-slate-900">
+            <Header />
 
-                <div className="grid gap-6 lg:grid-cols-[1.8fr_0.95fr]">
-                    <section className="space-y-6">
-                        <div
-                            className="group relative rounded-3xl border-2 border-dashed border-slate-300 bg-white/80 px-6 py-12 text-center transition hover:border-slate-400"
-                            onDragOver={(event) => event.preventDefault()}
-                            onDrop={handleDrop}
-                        >
-                            <UploadCloud className="mx-auto h-12 w-12 text-slate-500" />
-                            <div className="mt-6 space-y-3">
-                                <p className="text-lg font-semibold text-slate-900">Drag & drop product photos</p>
-                                <p className="text-sm text-slate-500">
-                                    JPG, PNG, HEIC supported. Automatic conversion + resize to 1080px width.
-                                </p>
-                                <label className="inline-flex cursor-pointer items-center justify-center rounded-full bg-slate-900 px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800">
-                                    Browse files
-                                    <input
-                                        type="file"
-                                        accept="image/*"
-                                        multiple
-                                        className="sr-only"
-                                        onChange={(event) => {
-                                            if (event.target.files) {
-                                                handleInputFiles(event.target.files);
-                                                event.target.value = '';
-                                            }
-                                        }}
-                                    />
-                                </label>
-                            </div>
-                        </div>
-
-                        <div className="rounded-3xl bg-white p-5 shadow-sm">
-                            <div className="flex items-center justify-between gap-4">
-                                <div>
-                                    <h2 className="text-lg font-semibold text-slate-950">Preview gallery</h2>
-                                    <p className="text-sm text-slate-500">
-                                        Track processing, reprocess with new settings, or remove items.
-                                    </p>
-                                </div>
-                                <div className="inline-flex rounded-full bg-slate-100 px-3 py-1 text-sm text-slate-700">
-                                    {items.length} files
-                                </div>
-                            </div>
-
-                            <div className="mt-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-                                {items.map((item) => (
-                                    <div
-                                        key={item.id}
-                                        className="group relative overflow-hidden rounded-3xl border border-slate-200 bg-slate-50"
-                                    >
-                                        <div className="relative h-48 overflow-hidden bg-slate-200">
-                                            <img src={item.preview} alt={item.name} className="h-full w-full object-cover" />
-                                            <button
-                                                type="button"
-                                                className="absolute right-3 top-3 rounded-full bg-white/90 p-2 text-slate-600 shadow-sm transition hover:bg-white"
-                                                onClick={() => removeItem(item.id)}
-                                            >
-                                                <Trash2 className="h-4 w-4" />
-                                            </button>
-                                        </div>
-                                        <div className="space-y-3 p-4">
-                                            <div className="flex items-center justify-between gap-2">
-                                                <p className="truncate text-sm font-medium text-slate-900">{item.name}</p>
-                                                <span
-                                                    className={`rounded-full px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] ${
-                                                        item.status === 'ready'
-                                                            ? 'bg-emerald-100 text-emerald-700'
-                                                            : item.status === 'processing'
-                                                              ? 'bg-sky-100 text-sky-700'
-                                                              : item.status === 'error'
-                                                                ? 'bg-rose-100 text-rose-700'
-                                                                : 'bg-slate-100 text-slate-700'
-                                                    }`}
-                                                >
-                                                    {item.status}
-                                                </span>
-                                            </div>
-                                            {item.status === 'processing' ? (
-                                                <div className="flex items-center gap-2 text-slate-500">
-                                                    <Loader2 className="h-4 w-4 animate-spin" />
-                                                    <span className="text-sm">Processing</span>
-                                                </div>
-                                            ) : item.status === 'ready' ? (
-                                                <div className="flex items-center gap-2 text-emerald-700">
-                                                    <CheckCircle2 className="h-4 w-4" />
-                                                    <span className="text-sm">Ready to download</span>
-                                                </div>
-                                            ) : item.status === 'error' ? (
-                                                <p className="text-sm text-rose-600">{item.error ?? 'Failed'}</p>
-                                            ) : null}
-                                        </div>
-                                    </div>
-                                ))}
-                                {items.length === 0 ? (
-                                    <div className="col-span-full rounded-3xl border border-dashed border-slate-300 p-8 text-center text-slate-500">
-                                        <ImagePlus className="mx-auto h-10 w-10" />
-                                        <p className="mt-4 text-sm">No files uploaded yet. Drop photos to begin.</p>
-                                    </div>
-                                ) : null}
-                            </div>
-                        </div>
+            <main className="flex-1 px-4 py-6 sm:px-6 lg:px-10">
+                <div className="mx-auto max-w-7xl">
+                    <section className="mb-8 text-center">
+                        <h1 className="text-2xl font-bold tracking-tight text-slate-950 sm:text-4xl">
+                            Optimize product photos with your logo
+                        </h1>
+                        <p className="mx-auto mt-2 max-w-2xl text-sm text-slate-600 sm:text-base">
+                            Convert HEIC to JPG, resize to the 1080px Facebook gold standard, and watermark your shop logo — all
+                            in your browser.
+                        </p>
                     </section>
 
-                    <aside className="space-y-6 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-                        <div className="flex items-center gap-3">
-                            <div>
-                                <h2 className="flex items-center gap-2 text-lg font-semibold text-slate-950">
-                                    <SlidersHorizontal className="h-5 w-5" />
+                    <StepIndicator current={step} hasItems={items.length > 0} hasReadyItems={completedCount > 0} />
+
+                    {items.length > 0 && (
+                        <div className="mt-5 space-y-3">
+                            <BatchProgressBar total={items.length} completed={completedCount} errors={errorCount} />
+
+                            {/* Mobile action bar */}
+                            <div className="flex items-center justify-between gap-3 lg:hidden">
+                                <button
+                                    type="button"
+                                    onClick={() => setDrawerOpen(true)}
+                                    className="inline-flex items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700"
+                                >
                                     Settings
-                                </h2>
-                                <p className="text-sm text-slate-500">
-                                    Logo, watermark toggle, and quality controls for Facebook-ready posts.
-                                </p>
-                            </div>
-                        </div>
-
-                        <div className="rounded-3xl border border-slate-200 bg-slate-50 p-4">
-                            <p className="text-sm font-semibold text-slate-900">Shop logo</p>
-                            <p className="mt-1 text-sm text-slate-500">This logo is applied to every finished image.</p>
-                            <div className="mt-4 flex items-center gap-4">
-                                <div className="h-20 w-20 overflow-hidden rounded-3xl bg-white shadow-sm">
-                                    {logoPreview ? (
-                                        <img src={logoPreview} alt="Logo preview" className="h-full w-full object-contain p-2" />
-                                    ) : (
-                                        <div className="flex h-full w-full items-center justify-center text-slate-400">Logo</div>
-                                    )}
+                                </button>
+                                <div className="flex-1">
+                                    <DownloadButton items={items} onBusyChange={setBusyMessage} />
                                 </div>
-                                <label className="inline-flex cursor-pointer items-center rounded-full bg-slate-900 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800">
-                                    Upload logo
-                                    <input type="file" accept="image/*" className="sr-only" onChange={handleLogoUpload} />
-                                </label>
                             </div>
                         </div>
+                    )}
 
-                        <div className="rounded-3xl border border-slate-200 bg-slate-50 p-4">
-                            <div className="flex items-center justify-between gap-3">
+                    <div className="mt-6 grid gap-6 lg:grid-cols-[1.8fr_0.95fr]">
+                        <section className="min-w-0 space-y-6">
+                            <DropZone onFiles={handleFiles} />
+
+                            {items.length > 0 && (
+                                <div className="rounded-3xl bg-white p-5 shadow-sm">
+                                    <div className="mb-4 flex items-center justify-between gap-4">
+                                        <div>
+                                            <h2 className="text-lg font-semibold text-slate-950">Your photos</h2>
+                                            <p className="text-sm text-slate-500">
+                                                Track processing, preview optimized results, or download each photo.
+                                            </p>
+                                        </div>
+                                        <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-slate-100 px-3 py-1 text-sm text-slate-700">
+                                            <Save className="h-3.5 w-3.5" />
+                                            {items.length}
+                                        </span>
+                                    </div>
+
+                                    <ProcessingSummary items={items} />
+
+                                    <div className="mt-4">
+                                        <ImageGrid
+                                            items={items}
+                                            onRemove={removeItem}
+                                            onDownloadSingle={downloadSingleImage}
+                                            onPreview={handlePreview}
+                                            watermarkApplied={watermarkEnabled && !!logoPreview}
+                                        />
+                                    </div>
+                                </div>
+                            )}
+                        </section>
+
+                        <aside className="hidden self-start rounded-3xl border border-slate-200 bg-white p-5 shadow-sm lg:block">
+                            <div className="mb-4">
+                                <h2 className="text-lg font-semibold text-slate-950">Settings</h2>
+                                <p className="text-sm text-slate-500">Watermark &amp; quality controls.</p>
+                            </div>
+                            <SettingsPanel {...settingsProps} />
+                        </aside>
+                    </div>
+
+                    {busyMessage && (
+                        <div className="mt-6 rounded-2xl bg-slate-950 px-4 py-3 text-sm text-slate-100">
+                            <div className="flex items-center gap-2">
+                                <span className="h-4 w-4 animate-spin rounded-full border-2 border-slate-500 border-t-white" />
+                                <span>{busyMessage}</span>
+                            </div>
+                        </div>
+                    )}
+
+                    {allDone && step !== 'download' && (
+                        <div className="mt-8 rounded-3xl bg-slate-950 p-6 text-slate-50 shadow-lg sm:p-8">
+                            <div className="flex flex-col items-start gap-4 sm:flex-row sm:items-center sm:justify-between">
                                 <div>
-                                    <p className="text-sm font-semibold text-slate-900">Watermark</p>
-                                    <p className="mt-1 text-sm text-slate-500">
-                                        Add your shop logo to the bottom-right corner of each image.
+                                    <h3 className="text-lg font-semibold">All {items.length} photos are ready!</h3>
+                                    <p className="mt-1 text-sm text-slate-400">
+                                        Download your optimized, watermarked photos as a single ZIP file.
                                     </p>
                                 </div>
                                 <button
                                     type="button"
-                                    className={`inline-flex h-10 w-20 items-center rounded-full p-1 transition ${
-                                        watermarkEnabled ? 'bg-sky-600' : 'bg-slate-300'
-                                    }`}
-                                    onClick={() => setWatermarkEnabled((current) => !current)}
+                                    onClick={() => setStep('download')}
+                                    className="inline-flex items-center gap-2 rounded-full bg-sky-500 px-6 py-3 text-sm font-semibold text-white transition hover:bg-sky-600"
                                 >
-                                    <span
-                                        className={`h-8 w-8 rounded-full bg-white transition ${watermarkEnabled ? 'translate-x-5' : 'translate-x-0'}`}
-                                    />
+                                    <Save className="h-4 w-4" />
+                                    Go to download
                                 </button>
                             </div>
                         </div>
+                    )}
 
-                        <div className="rounded-3xl border border-slate-200 bg-slate-50 p-4">
-                            <div className="flex items-center justify-between gap-4">
+                    {step === 'download' && items.length > 0 && allDone && (
+                        <div className="mt-8 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
+                            <div className="flex flex-col items-center gap-6 text-center sm:flex-row sm:justify-between sm:text-left">
                                 <div>
-                                    <p className="text-sm font-semibold text-slate-900">Compression quality</p>
-                                    <p className="mt-1 text-sm text-slate-500">
-                                        Higher quality means larger files. Recommended 80–92 for Facebook.
+                                    <h3 className="text-xl font-bold text-slate-950">All set!</h3>
+                                    <p className="mt-1 text-sm text-slate-600">
+                                        {completedCount} optimized photos. Download individually or grab the full ZIP.
                                     </p>
                                 </div>
-                                <span className="rounded-full bg-white px-3 py-1 text-sm font-semibold text-slate-900 shadow-sm">
-                                    {quality}%
-                                </span>
-                            </div>
-                            <input
-                                type="range"
-                                min="50"
-                                max="100"
-                                step="1"
-                                value={quality}
-                                onChange={(event) => setQuality(Number(event.target.value))}
-                                className="mt-4 w-full accent-sky-600"
-                            />
-                        </div>
-
-                        <div className="space-y-3">
-                            <button
-                                type="button"
-                                className="inline-flex w-full items-center justify-center gap-2 rounded-3xl bg-slate-900 px-5 py-3 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
-                                onClick={reprocessAll}
-                                disabled={items.length === 0}
-                            >
-                                <ImagePlus className="h-4 w-4" />
-                                Reprocess all photos
-                            </button>
-                            <button
-                                type="button"
-                                className="inline-flex w-full items-center justify-center gap-2 rounded-3xl bg-sky-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-sky-700 disabled:cursor-not-allowed disabled:opacity-60"
-                                onClick={downloadZip}
-                                disabled={completedCount === 0}
-                            >
-                                <Download className="h-4 w-4" />
-                                Download ZIP
-                            </button>
-                        </div>
-
-                        {busyMessage ? (
-                            <div className="rounded-3xl bg-slate-950 px-4 py-3 text-sm text-slate-100 shadow-sm">
-                                <div className="flex items-center gap-2">
-                                    <Loader2 className="h-4 w-4 animate-spin" />
-                                    <span>{busyMessage}</span>
+                                <div className="w-full sm:w-64">
+                                    <DownloadButton items={items} onBusyChange={setBusyMessage} />
                                 </div>
                             </div>
-                        ) : null}
-                    </aside>
+                        </div>
+                    )}
                 </div>
+            </main>
 
-                <section className="mt-12">
-                    <div className="mx-auto max-w-4xl">
-                        <div className="text-center">
-                            <h2 className="text-2xl font-semibold text-slate-950">Frequently Asked Questions</h2>
-                            <p className="mt-2 text-sm text-slate-600">
-                                Everything you need to know about optimizing your Facebook product photos.
-                            </p>
-                        </div>
+            <Footer />
 
-                        <div className="mt-8 space-y-6">
-                            <details className="group rounded-2xl border border-slate-200 bg-white p-4">
-                                <summary className="flex cursor-pointer items-center justify-between font-semibold text-slate-900">
-                                    How does this tool work?
-                                    <span className="ml-2 text-slate-500 group-open:rotate-180">
-                                        <ChevronDown />
-                                    </span>
-                                </summary>
-                                <div className="mt-3 text-sm text-slate-600">
-                                    <p>
-                                        This tool runs entirely in your browser. When you upload photos, they&apos;re processed locally
-                                        using JavaScript libraries. HEIC files are converted to JPG, images are resized to 1080px width
-                                        (Facebook&apos;s optimal size), watermarks are applied, and everything is packaged into a ZIP file
-                                        for download. No data ever leaves your device.
-                                    </p>
-                                </div>
-                            </details>
+            <SettingsDrawer
+                open={drawerOpen}
+                onClose={() => setDrawerOpen(false)}
+                {...settingsProps}
+            />
 
-                            <details className="group rounded-2xl border border-slate-200 bg-white p-4">
-                                <summary className="flex cursor-pointer items-center justify-between font-semibold text-slate-900">
-                                    What file formats are supported?
-                                    <span className="ml-2 text-slate-500 group-open:rotate-180">
-                                        <ChevronDown />
-                                    </span>
-                                </summary>
-                                <div className="mt-3 text-sm text-slate-600">
-                                    <p>
-                                        Supports JPG, PNG, and HEIC formats. HEIC files (common on iPhones) are automatically converted to
-                                        JPG. All output files are optimized JPGs regardless of input format.
-                                    </p>
-                                </div>
-                            </details>
-
-                            <details className="group rounded-2xl border border-slate-200 bg-white p-4">
-                                <summary className="flex cursor-pointer items-center justify-between font-semibold text-slate-900">
-                                    Why 1080px width specifically?
-                                    <span className="ml-2 text-slate-500 group-open:rotate-180">
-                                        <ChevronDown />
-                                    </span>
-                                </summary>
-                                <div className="mt-3 text-sm text-slate-600">
-                                    <p>
-                                        Facebook Marketplace and Instagram Shop optimize best at 1080px width. This size provides the
-                                        perfect balance between quality and file size for fast loading on mobile networks in Bangladesh.
-                                        Higher resolutions get compressed aggressively by Facebook anyway.
-                                    </p>
-                                </div>
-                            </details>
-
-                            <details className="group rounded-2xl border border-slate-200 bg-white p-4">
-                                <summary className="flex cursor-pointer items-center justify-between font-semibold text-slate-900">
-                                    Is my data safe and private?
-                                    <span className="ml-2 text-slate-500 group-open:rotate-180">
-                                        <ChevronDown />
-                                    </span>
-                                </summary>
-                                <div className="mt-3 text-sm text-slate-600">
-                                    <p>
-                                        Absolutely. This is a client-side only tool - all processing happens in your browser. Your photos
-                                        never touch any server, database, or cloud service. You can verify this by checking your
-                                        browser&apos;s network tab during processing (no external requests are made).
-                                    </p>
-                                </div>
-                            </details>
-
-                            <details className="group rounded-2xl border border-slate-200 bg-white p-4">
-                                <summary className="flex cursor-pointer items-center justify-between font-semibold text-slate-900">
-                                    What&apos;s the recommended compression quality?
-                                    <span className="ml-2 text-slate-500 group-open:rotate-180">
-                                        <ChevronDown />
-                                    </span>
-                                </summary>
-                                <div className="mt-3 text-sm text-slate-600">
-                                    <p>
-                                        For Facebook Marketplace, we recommend 80-92% quality. This typically results in files under 600KB
-                                        while maintaining excellent visual quality. Higher quality means larger files, which can be
-                                        problematic on slow mobile connections in Bangladesh.
-                                    </p>
-                                </div>
-                            </details>
-
-                            <details className="group rounded-2xl border border-slate-200 bg-white p-4">
-                                <summary className="flex cursor-pointer items-center justify-between font-semibold text-slate-900">
-                                    Does it work on mobile phones?
-                                    <span className="ml-2 text-slate-500 group-open:rotate-180">
-                                        <ChevronDown />
-                                    </span>
-                                </summary>
-                                <div className="mt-3 text-sm text-slate-600">
-                                    <p>
-                                        Yes! The tool is fully responsive and works on mobile browsers. However, for best performance with
-                                        large batches, we recommend using a desktop or laptop computer. Mobile browsers have memory
-                                        limitations that might affect processing of very large image batches.
-                                    </p>
-                                </div>
-                            </details>
-
-                            <details className="group rounded-2xl border border-slate-200 bg-white p-4">
-                                <summary className="flex cursor-pointer items-center justify-between font-semibold text-slate-900">
-                                    Can I process hundreds of photos at once?
-                                    <span className="ml-2 text-slate-500 group-open:rotate-180">
-                                        <ChevronDown />
-                                    </span>
-                                </summary>
-                                <div className="mt-3 text-sm text-slate-600">
-                                    <p>
-                                        Yes, but browser memory limits apply. Most modern computers can handle 50-100 photos in a single
-                                        batch. If you have thousands of photos, process them in smaller batches. The tool is optimized for
-                                        Bangladesh&apos;s typical Facebook seller workflow of 20-50 product photos per listing session.
-                                    </p>
-                                </div>
-                            </details>
-
-                            <details className="group rounded-2xl border border-slate-200 bg-white p-4">
-                                <summary className="flex cursor-pointer items-center justify-between font-semibold text-slate-900">
-                                    What browsers are supported?
-                                    <span className="ml-2 text-slate-500 group-open:rotate-180">
-                                        <ChevronDown />
-                                    </span>
-                                </summary>
-                                <div className="mt-3 text-sm text-slate-600">
-                                    <p>
-                                        Works on all modern browsers: Chrome, Firefox, Safari, and Edge. Requires JavaScript enabled. For
-                                        best HEIC support, use Chrome or Safari. The tool uses modern web APIs that are widely supported in
-                                        browsers from 2020 onwards.
-                                    </p>
-                                </div>
-                            </details>
-                        </div>
-                    </div>
-                </section>
-
-                <footer className="mt-12">
-                    <div className="mx-auto max-w-4xl text-center">
-                        <div className="mt-6 flex flex-wrap items-center justify-center gap-4 text-sm text-slate-500">
-                            <Link href="/privacy-policy" className="hover:text-slate-900">
-                                Privacy Policy
-                            </Link>
-                            <Link href="/terms" className="hover:text-slate-900">
-                                Terms
-                            </Link>
-                            <span>© {new Date().getFullYear()} SnapShot team</span>
-                        </div>
-                    </div>
-                </footer>
-            </div>
-        </main>
+            {previewUrl && <PreviewModal imageUrl={previewUrl} onClose={() => setPreviewUrl(null)} />}
+        </div>
     );
 }

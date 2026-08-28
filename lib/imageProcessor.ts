@@ -1,5 +1,3 @@
-import heic2any from 'heic2any';
-import imageCompression from 'browser-image-compression';
 import { overlayWatermark, WatermarkOptions } from '@/lib/watermarkEngine';
 
 export type ImageProcessOptions = {
@@ -10,7 +8,17 @@ export type ImageProcessOptions = {
     watermarkOptions?: WatermarkOptions;
 };
 
+/**
+ * Process an image file entirely in the browser.
+ * Note: heuristic libraries are imported dynamically so they are only loaded
+ * client-side and never evaluated during server-side rendering.
+ */
 export async function processImageFile(file: File, options: ImageProcessOptions): Promise<Blob> {
+    const [{ default: heic2any }, { default: imageCompression }] = await Promise.all([
+        import('heic2any'),
+        import('browser-image-compression'),
+    ]);
+
     let workFile = file;
     const originalName = file.name.replace(/\.[^.]+$/, '');
 
